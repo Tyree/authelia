@@ -242,10 +242,10 @@ The following table indicates the various sub-claims within the address claim.
 
 This scope allows the client to access the address information the authentication backend reports about the user.
 
-|        [Claim]        |   JWT Type    |       Authelia Attribute       | Default Location |                                              Description                                              |
-|:---------------------:|:-------------:|:------------------------------:|:----------------:|:-----------------------------------------------------------------------------------------------------:|
-|     phone_number      |    string     | phone_number + phone_extension |    [UserInfo]    | The combination of the users phone number and extension in the format specified in OpenID Connect 1.0 |
-| phone_number_verified |    string     | phone_number + phone_extension |    [UserInfo]    | The combination of the users phone number and extension in the format specified in OpenID Connect 1.0 |
+|        [Claim]        | JWT Type |       Authelia Attribute       | Default Location |                                              Description                                              |
+|:---------------------:|:--------:|:------------------------------:|:----------------:|:-----------------------------------------------------------------------------------------------------:|
+|     phone_number      |  string  | phone_number + phone_extension |    [UserInfo]    | The combination of the users phone number and extension in the format specified in OpenID Connect 1.0 |
+| phone_number_verified | boolean  |              N/A               |    [UserInfo]    |                        Currently returns true if the phone number has a value.                        |
 
 ### groups
 
