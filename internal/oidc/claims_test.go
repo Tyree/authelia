@@ -18,6 +18,50 @@ import (
 	"github.com/authelia/authelia/v4/internal/oidc"
 )
 
+/*
+func TestClaimValidate(t *testing.T) {
+	config := schema.IdentityProvidersOpenIDConnect{
+		Scopes: map[string]schema.IdentityProvidersOpenIDConnectScope{
+			"example": {
+				Claims: []string{"preferred_username", "name"},
+			},
+		},
+		Clients: []schema.IdentityProvidersOpenIDConnectClient{
+			{
+				ID:           "example-client",
+				Scopes:       []string{"openid", "example"},
+				ClaimsPolicy: "default",
+			},
+		},
+		ClaimsPolicies: map[string]schema.IdentityProvidersOpenIDConnectClaimsPolicy{
+			"default": {},
+		},
+	}
+
+	strategy := oidc.NewCustomClaimsStrategy(config.Clients[0], config.Scopes, config.ClaimsPolicies)
+
+	client := &oidc.RegisteredClient{
+		ID:     "example-client",
+		Scopes: []string{"openid", "example"},
+	}
+
+	requests := &oidc.ClaimsRequests{
+		IDToken: map[string]*oidc.ClaimRequest{
+			"name": nil,
+			"preferred_username": {
+				Essential: true,
+			},
+		},
+	}
+
+	ctx := &TestContext{}
+
+	err := strategy.ValidateClaimsRequests(ctx, oauthelia2.ExactScopeStrategy, client, requests)
+
+	assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(err))
+}
+*/
+
 func TestClaimRequest_String(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -202,6 +246,7 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 
 	testCases := []struct {
 		name       string
+		claims     []string
 		requested  any
 		detailer   any
 		expectedID any
@@ -211,6 +256,7 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 	}{
 		{
 			"ShouldPassString",
+			[]string{"example-claim"},
 			"apple",
 			"apple",
 			"apple",
@@ -219,7 +265,18 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 			"",
 		},
 		{
+			"ShouldNotPassNonEssentialString",
+			[]string{},
+			"apple",
+			"apple",
+			nil,
+			"apple",
+			false,
+			"",
+		},
+		{
 			"ShouldNotPassMismatchedTypes",
+			[]string{},
 			"apple",
 			123,
 			nil,
@@ -229,6 +286,7 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 		},
 		{
 			name:    "ShouldPassNumbers",
+			claims:  []string{"example-claim"},
 			numbers: true,
 		},
 	}
@@ -269,13 +327,13 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 								},
 							}
 
-							assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, requests.IDToken, detailer, start, map[string]any{}, extra)))
+							assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, tc.claims, requests.IDToken, detailer, start, map[string]any{}, extra)))
 
 							assert.Equal(t, dst, extra[claim])
 
 							extra = make(map[string]any)
 
-							assert.NoError(t, client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, requests.UserInfo, detailer, start, map[string]any{}, extra))
+							assert.NoError(t, client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, tc.claims, requests.UserInfo, detailer, start, map[string]any{}, extra))
 
 							assert.Equal(t, dst, extra[claim])
 
@@ -292,13 +350,13 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 								},
 							}
 
-							assert.NoError(t, client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, requests.IDToken, detailer, start, map[string]any{}, extra))
+							assert.NoError(t, client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, tc.claims, requests.IDToken, detailer, start, map[string]any{}, extra))
 
 							assert.Equal(t, dst, extra[claim])
 
 							extra = make(map[string]any)
 
-							assert.NoError(t, client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, requests.UserInfo, detailer, start, map[string]any{}, extra))
+							assert.NoError(t, client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, tc.claims, requests.UserInfo, detailer, start, map[string]any{}, extra))
 
 							assert.Equal(t, dst, extra[claim])
 						})
@@ -333,7 +391,7 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 				},
 			}
 
-			err := client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, requests.IDToken, detailer, start, map[string]any{}, extra)
+			err := client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, scopes, tc.claims, requests.IDToken, detailer, start, map[string]any{}, extra)
 
 			if tc.err == "" {
 				require.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(err))
@@ -344,7 +402,7 @@ func TestNewClaimRequestsMatcher(t *testing.T) {
 
 			extra = make(map[string]any)
 
-			err = client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, requests.UserInfo, detailer, start, map[string]any{}, extra)
+			err = client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, scopes, tc.claims, requests.UserInfo, detailer, start, map[string]any{}, extra)
 
 			if tc.err == "" {
 				require.NoError(t, err)
@@ -690,6 +748,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 		requests         *oidc.ClaimsRequests
 		detailer         oidc.UserDetailer
 		err              string
+		claims           []string
 		original         map[string]any
 		expectedIDToken  map[string]any
 		expectedUserInfo map[string]any
@@ -735,6 +794,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -786,8 +846,9 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
-			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": 123},
+			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
 			"",
 			"",
@@ -837,6 +898,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{"example-claim"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": 123},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -844,7 +906,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 			"",
 		},
 		{
-			"ShouldGrantRequestedClaimsIDTokenRequestedValue",
+			"ShouldGrantRequestedClaimsIDTokenRequestedValueFloat64",
 			schema.IdentityProvidersOpenIDConnect{
 				Scopes: map[string]schema.IdentityProvidersOpenIDConnectScope{
 					"example-scope": {
@@ -888,6 +950,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{"example-claim"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": float64(1234)},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": float64(1234), oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -939,6 +1002,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{"example-claim"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": int64(1234)},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": int64(1234), oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -990,6 +1054,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -1038,8 +1103,58 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{"example-claim"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimJWTID: "EXAMPLE", oidc.ClaimFullName: "Not John Smith"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": 123},
+			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
+			"",
+			"",
+		},
+		{
+			"ShouldNotGrantRequestedClaimsIDTokenButNotPropagateIDTokenClaimsNotGranted",
+			schema.IdentityProvidersOpenIDConnect{
+				Scopes: map[string]schema.IdentityProvidersOpenIDConnectScope{
+					"example-scope": {
+						Claims: []string{"example-claim"},
+					},
+				},
+				ClaimsPolicies: map[string]schema.IdentityProvidersOpenIDConnectClaimsPolicy{
+					"example-policy": {
+						IDToken:     []string{},
+						AccessToken: []string{},
+						CustomClaims: map[string]schema.IdentityProvidersOpenIDConnectCustomClaim{
+							"example-claim": {
+								Attribute: "example-claim",
+							},
+						},
+					},
+				},
+				Clients: []schema.IdentityProvidersOpenIDConnectClient{
+					{
+						ID:           "example-client",
+						Scopes:       []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeGroups, oidc.ScopeEmail, "example-scope"},
+						ClaimsPolicy: "example-policy",
+					},
+				},
+			},
+			[]string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeGroups, oidc.ScopeEmail, "example-scope"},
+			&oidc.ClaimsRequests{
+				IDToken:  map[string]*oidc.ClaimRequest{"example-claim": nil},
+				UserInfo: nil,
+			},
+			&testDetailer{
+				username: "john",
+				groups:   []string{"abc", "123"},
+				name:     "John Smith",
+				emails:   []string{"john.smith@authelia.com"},
+				extra: map[string]any{
+					"example-claim": 123,
+				},
+			},
+			"",
+			[]string{},
+			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimJWTID: "EXAMPLE", oidc.ClaimFullName: "Not John Smith"},
+			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
 			"",
 			"",
@@ -1092,6 +1207,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, "example-claim-alt": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -1140,6 +1256,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimJWTID: "EXAMPLE", oidc.ClaimFullName: "Not John Smith"},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -1185,6 +1302,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 				},
 			},
 			"",
+			[]string{},
 			map[string]any{oidc.ClaimAuthenticationTime: 123},
 			map[string]any{oidc.ClaimAuthenticationTime: 123, oidc.ClaimAudience: []string{"example-client"}, "example-claim": 123},
 			map[string]any{oidc.ClaimEmail: "john.smith@authelia.com", oidc.ClaimEmailVerified: true, "example-claim": 123, oidc.ClaimGroups: []string{"abc", "123"}, oidc.ClaimFullName: "John Smith", oidc.ClaimPreferredUsername: "john", oidc.ClaimUpdatedAt: int64(123123123)},
@@ -1228,7 +1346,7 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 
 			extra = make(map[string]any)
 
-			err := client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, tc.scopes, requests, tc.detailer, start, tc.original, extra)
+			err := client.ClaimsStrategy.PopulateIDTokenClaims(ctx, strategy, client, tc.scopes, tc.claims, requests, tc.detailer, start, tc.original, extra)
 
 			if tc.errIDToken == "" {
 				assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(err))
@@ -1239,14 +1357,14 @@ func TestNewCustomClaimsStrategy(t *testing.T) {
 			assert.Equal(t, tc.expectedIDToken, extra)
 
 			if tc.requests != nil && tc.requests.UserInfo != nil {
-				requests = tc.requests.IDToken
+				requests = tc.requests.UserInfo
 			} else {
 				requests = make(map[string]*oidc.ClaimRequest)
 			}
 
 			extra = make(map[string]any)
 
-			err = client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, tc.scopes, requests, tc.detailer, start, tc.original, extra)
+			err = client.ClaimsStrategy.PopulateUserInfoClaims(ctx, strategy, client, tc.scopes, tc.claims, requests, tc.detailer, start, tc.original, extra)
 
 			if tc.errUserInfo == "" {
 				assert.NoError(t, oauthelia2.ErrorToDebugRFC6749Error(err))

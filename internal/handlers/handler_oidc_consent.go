@@ -96,7 +96,7 @@ func OpenIDConnectConsentPOST(ctx *middlewares.AutheliaCtx) {
 	}
 
 	if bodyJSON.Consent {
-		consent.Grant()
+		consent.GrantWithClaims(bodyJSON.Claims)
 
 		if bodyJSON.PreConfigure {
 			if client.GetConsentPolicy().Mode == oidc.ClientConsentModePreConfigured {

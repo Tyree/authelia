@@ -62,6 +62,7 @@ func NewSessionWithRequester(ctx Context, issuer *url.URL, kid, username string,
 		ExcludeNotBeforeClaim: false,
 		AllowedTopLevelClaims: nil,
 		ClaimRequests:         claims,
+		GrantedClaims:         consent.GrantedClaims,
 		Extra:                 map[string]any{},
 	}
 
@@ -82,6 +83,7 @@ type Session struct {
 	ExcludeNotBeforeClaim bool            `json:"exclude_nbf_claim"`
 	AllowedTopLevelClaims []string        `json:"allowed_top_level_claims"`
 	ClaimRequests         *ClaimsRequests `json:"claim_requests,omitempty"`
+	GrantedClaims         []string        `json:"granted_claims,omitempty"`
 	Extra                 map[string]any  `json:"extra"`
 }
 

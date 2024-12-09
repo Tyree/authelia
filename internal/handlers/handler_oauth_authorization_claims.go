@@ -29,7 +29,7 @@ func handleOAuth2AuthorizationClaims(ctx *middlewares.AutheliaCtx, rw http.Respo
 		scopeStrategy := ctx.Providers.OpenIDConnect.GetScopeStrategy(ctx)
 
 		if err = claimsStrategy.ValidateClaimsRequests(ctx, scopeStrategy, client, requests); err != nil {
-			ctx.Logger.WithError(err).Errorf("%s Request with id '%s' on client with id '%s' could not be processed: the client reqwuested claims were not permitted.", flow, requester.GetID(), client.GetID())
+			ctx.Logger.WithError(oauthelia2.ErrorToDebugRFC6749Error(err)).Errorf("%s Request with id '%s' on client with id '%s' could not be processed: the client requested claims were not permitted.", flow, requester.GetID(), client.GetID())
 
 			ctx.Providers.OpenIDConnect.WriteAuthorizeError(ctx, rw, requester, oauthelia2.ErrAccessDenied.WithHint("The requested subject was not the same subject that attempted to authorize the request."))
 
@@ -54,7 +54,7 @@ func handleOAuth2AuthorizationClaims(ctx *middlewares.AutheliaCtx, rw http.Respo
 
 		oidc.GrantScopeAudienceConsent(requester, consent)
 
-		if err = claimsStrategy.PopulateIDTokenClaims(ctx, scopeStrategy, client, requester.GetGrantedScopes(), requests.GetIDTokenRequests(), details, ctx.Clock.Now(), nil, extra); err != nil {
+		if err = claimsStrategy.PopulateIDTokenClaims(ctx, scopeStrategy, client, requester.GetGrantedScopes(), oauthelia2.Arguments(consent.GrantedClaims), requests.GetIDTokenRequests(), details, ctx.Clock.Now(), nil, extra); err != nil {
 			ctx.Logger.Errorf("%s Response for Request with id '%s' on client with id '%s' could not be created: %s", flow, requester.GetID(), client.GetID(), oauthelia2.ErrorToDebugRFC6749Error(err))
 
 			ctx.Providers.OpenIDConnect.WriteAuthorizeError(ctx, rw, requester, err)

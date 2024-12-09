@@ -84,7 +84,15 @@ func handleOIDCAuthorizationConsentModeImplicitWithID(ctx *middlewares.AutheliaC
 		return nil, true
 	}
 
-	consent.Grant()
+	var requests *oidc.ClaimsRequests
+
+	if requests, err = oidc.NewClaimRequests(requester.GetRequestForm()); err != nil {
+		consent.Grant()
+	} else {
+		claims, _ := requests.ToSlices()
+
+		consent.GrantWithClaims(claims)
+	}
 
 	if err = ctx.Providers.StorageProvider.SaveOAuth2ConsentSessionResponse(ctx, consent, false); err != nil {
 		ctx.Logger.Errorf(logFmtErrConsentSaveSessionResponse, requester.GetID(), client.GetID(), client.GetConsentPolicy(), consent.ChallengeID, err)

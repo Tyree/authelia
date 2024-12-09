@@ -254,8 +254,8 @@ type ClaimResolver func(attribute string) (value any, ok bool)
 
 type ClaimsStrategy interface {
 	ValidateClaimsRequests(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, requests *ClaimsRequests) (err error)
-	PopulateIDTokenClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error)
-	PopulateUserInfoClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error)
+	PopulateIDTokenClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes, claims oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error)
+	PopulateUserInfoClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes, claims oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error)
 	PopulateClientCredentialsUserInfoClaims(ctx Context, client Client, original, extra map[string]any) (err error)
 }
 
@@ -425,16 +425,16 @@ claims:
 		return nil
 	}
 
-	elements := make([]string, len(invalid))
+	elements := make([]string, 0, len(invalid))
 
 	for scope, claims := range invalid {
 		elements = append(elements, fmt.Sprintf("claims %s require the '%s' scope", utils.StringJoinAnd(claims), scope))
 	}
 
-	return oauthelia2.ErrInvalidRequest.WithDebugf("The authorization request contained a claims request which is not permitted to make. The %s; but these scopes are absent from the client registration.", utils.StringJoinAnd(elements))
+	return oauthelia2.ErrInvalidRequest.WithDebugf("The authorization request contained a claims request which is not permitted to make. The %s; but these scopes are absent from the client registration.", strings.Join(elements, ", "))
 }
 
-func (s *CustomClaimsStrategy) PopulateIDTokenClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error) {
+func (s *CustomClaimsStrategy) PopulateIDTokenClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes, claims oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error) {
 	resolver := ctx.GetProviderUserAttributeResolver()
 
 	if resolver == nil {
@@ -448,12 +448,12 @@ func (s *CustomClaimsStrategy) PopulateIDTokenClaims(ctx Context, strategy oauth
 	s.populateClaimsOriginal(original, extra)
 	s.populateClaimsAudience(client, original, extra)
 	s.populateClaimsScoped(ctx, strategy, client, scopes, resolve, s.claimsIDToken, extra)
-	s.populateClaimsRequested(ctx, strategy, client, requests, resolve, extra)
+	s.populateClaimsRequested(ctx, strategy, client, requests, claims, resolve, extra)
 
 	return nil
 }
 
-func (s *CustomClaimsStrategy) PopulateUserInfoClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error) {
+func (s *CustomClaimsStrategy) PopulateUserInfoClaims(ctx Context, strategy oauthelia2.ScopeStrategy, client Client, scopes, claims oauthelia2.Arguments, requests map[string]*ClaimRequest, detailer UserDetailer, updated time.Time, original, extra map[string]any) (err error) {
 	resolver := ctx.GetProviderUserAttributeResolver()
 
 	if resolver == nil {
@@ -466,7 +466,7 @@ func (s *CustomClaimsStrategy) PopulateUserInfoClaims(ctx Context, strategy oaut
 
 	s.populateClaimsOriginalUserInfo(original, extra)
 	s.populateClaimsScoped(ctx, strategy, client, scopes, resolve, nil, extra)
-	s.populateClaimsRequested(ctx, strategy, client, requests, resolve, extra)
+	s.populateClaimsRequested(ctx, strategy, client, requests, claims, resolve, extra)
 
 	return nil
 }
@@ -542,7 +542,7 @@ func (s *CustomClaimsStrategy) populateClaimsScoped(_ Context, strategy oautheli
 	}
 }
 
-func (s *CustomClaimsStrategy) populateClaimsRequested(_ Context, strategy oauthelia2.ScopeStrategy, client Client, requests map[string]*ClaimRequest, resolve ClaimResolver, extra map[string]any) {
+func (s *CustomClaimsStrategy) populateClaimsRequested(_ Context, strategy oauthelia2.ScopeStrategy, client Client, requests map[string]*ClaimRequest, claims oauthelia2.Arguments, resolve ClaimResolver, extra map[string]any) {
 	if requests == nil || resolve == nil {
 		return
 	}
@@ -551,12 +551,16 @@ func (s *CustomClaimsStrategy) populateClaimsRequested(_ Context, strategy oauth
 
 claim:
 	for claim, request := range requests {
-		for scope, claims := range s.scopes {
+		for scope, claimSet := range s.scopes {
 			if !strategy(scopes, scope) {
 				continue
 			}
 
-			attribute, ok := claims[claim]
+			if (request == nil || !request.Essential) && !claims.Has(claim) {
+				continue
+			}
+
+			attribute, ok := claimSet[claim]
 
 			if !ok {
 				continue

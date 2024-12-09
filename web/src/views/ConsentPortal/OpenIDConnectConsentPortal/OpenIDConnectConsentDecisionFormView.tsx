@@ -105,7 +105,7 @@ const OpenIDConnectConsentDecisionFormView: React.FC<Props> = (props: Props) => 
         if (!response) {
             return;
         }
-        const res = await acceptConsent(preConfigure, response.client_id, consentID, claims.split(" "));
+        const res = await acceptConsent(preConfigure, response.client_id, consentID, JSON.parse(claims));
         if (res.redirect_uri) {
             redirect(res.redirect_uri);
         } else {

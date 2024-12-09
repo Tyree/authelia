@@ -197,9 +197,7 @@ type OAuth2ConsentSession struct {
 	GrantedScopes     StringSlicePipeDelimited `db:"granted_scopes"`
 	RequestedAudience StringSlicePipeDelimited `db:"requested_audience"`
 	GrantedAudience   StringSlicePipeDelimited `db:"granted_audience"`
-	// EssentialClaims   StringSlicePipeDelimited `db:"essential_claims"`
-	// RequestedClaims   StringSlicePipeDelimited `db:"requested_claims"`
-	// GrantedClaims     StringSlicePipeDelimited `db:"granted_claims"`.
+	GrantedClaims     StringSlicePipeDelimited `db:"granted_claims"`
 
 	PreConfiguration sql.NullInt64
 }
@@ -208,6 +206,12 @@ type OAuth2ConsentSession struct {
 func (s *OAuth2ConsentSession) Grant() {
 	s.GrantedScopes = s.RequestedScopes
 	s.GrantedAudience = s.RequestedAudience
+}
+
+func (s *OAuth2ConsentSession) GrantWithClaims(claims []string) {
+	s.Grant()
+
+	s.GrantedClaims = claims
 }
 
 // HasExactGrants returns true if the granted audience and scopes of this consent matches exactly with another
